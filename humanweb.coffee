@@ -164,7 +164,6 @@ server = http.createServer( (req, res) ->
     res.end 'Favicons are too hard to type by hand\n'
     return
   msg = req.method + ' ' + req.url + "\n"
-  console.log req
   msg += 'X-Forwarded-For: ' + req.socket.remoteAddress + "\n"
   msg += 'User Agent: ' + req.headers["user-agent"]
   client.buddylist.assignWork msg, (message) ->
