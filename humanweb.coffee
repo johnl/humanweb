@@ -69,7 +69,7 @@ class Buddylist
     @buddies[@idle[0]]
 
   sendMessage: (receiver, message) ->
-    console.log "Sending " + message + " to: " + receiver
+    #console.log "Sending " + message + " to: " + receiver
     e = new xmpp.Element 'message', { to: receiver, type: 'chat' }
     e.c('body').t message
     client.send e
@@ -107,11 +107,11 @@ client.on 'online', () ->
 client.on 'stanza', (stanza) ->
   if stanza.is('message') and (stanza.attrs.type == 'chat')
     buddy = client.buddylist.buddies[stanza.attrs.from]
-    buddy.onWorkFinished(stanza.children[0].children[0])
+    if buddy.onWorkFinished
+      buddy.onWorkFinished(stanza.children[0].children.join(''))
+    else
+      client.buddylist.sendMessage(buddy.jid, 'No web client currently waiting for message')
     client.buddylist.setIdle(buddy.jid)
-#    stanza.attrs.to = stanza.attrs.from
-#    delete stanza.attrs.from
-#    client.send(stanza)
   if stanza.is('iq')
     # roster response
     if stanza.attrs.type == 'result' and stanza.children[0].attrs.xmlns == 'jabber:iq:roster'
@@ -142,14 +142,16 @@ server = http.createServer( (req, res) ->
     res.writeHead 404, {'Content-type': 'text/plain'}
     res.end 'Favicons are too hard to type by hand\n'
     return
-  console.log "Received request"
-  client.buddylist.assignWork req.url, (message) ->
-    res.writeHead 200, {'Content-Type': 'text/plain'}
+  console.log "Received request from " + req.remoteAddress
+  msg = req.method + ' ' + req.url + ' HTTP ' + req.httpVersion + "\n"
+  msg += JSON.stringify(req.headers)
+  client.buddylist.assignWork msg, (message) ->
+    res.writeHead 200, {'Content-Type': 'text/html'}
     res.end message + '\n'
   , () ->
     console.log '503'
     res.writeHead 503, {'Content-Type': 'text/plain'}
-    res.end "No human available\n"
+    res.end "No human available to service your request\n"
 )
 
 server.listen 5000
