@@ -144,6 +144,10 @@ client.on 'error', (e) ->
   console.error('Error: ' + e)
 
 server = http.createServer( (req, res) ->
+  if req.url = "/"
+    res.writeHead 200, {'Content-type': 'text/html'}
+    res.end '<h1>The Human Powered Web Server</h1><p>Welcome to the human powered web server, type any URL in for this domain and the result will be fulfilled by a real live human.</p><p>If you would like to join the workforce, add humanweb@jabber.org to your Jabber or Google Talk buddy list.</p>'
+    return
   if req.url.match(/favicon.ico/)
     res.writeHead 404, {'Content-type': 'text/plain'}
     res.end 'Favicons are too hard to type by hand\n'
