@@ -102,6 +102,9 @@ client.syncSubscription = (q) ->
       client.send new xmpp.Element('presence', { to: jid, type: 'subscribe' })
     when 'both'
       console.log 'Already subscribed to ' + jid
+    when 'to'
+      console.log 'Unsubscribing from ' + jid
+      client.send new xmpp.Element('presence', { to: jid, type: 'unsubscribe' })
 
 client.on 'online', () ->
   console.log "Connected to xmpp server"
@@ -113,6 +116,10 @@ client.on 'online', () ->
 client.on 'stanza', (stanza) ->
   if stanza.is('message') and (stanza.attrs.type == 'chat')
     buddy = client.buddylist.buddies[stanza.attrs.from]
+    if buddy == undefined
+      console.error 'Received message from unknown buddy ' + stanza.attrs.from
+      return
+
     if buddy.onWorkFinished
       buddy.onWorkFinished(stanza.children[0].children.join(''))
     else
@@ -133,6 +140,10 @@ client.on 'stanza', (stanza) ->
         console.log "Subscribing user " + stanza.attrs.from
         e = new xmpp.Element('presence', { to : stanza.attrs.from, type : 'subscribed' })
         client.send e
+        client.getRoster()
+      when 'unsubscribe'
+        console.log "Unsubscribe from " + stanza.attrs.from
+        client.getRoster()
       when 'unavailable'
         console.log "Now unavailable: " + stanza.attrs.from
         client.buddylist.setOffline stanza.attrs.from
