@@ -144,7 +144,7 @@ server = http.createServer( (req, res) ->
     return
   console.log "Received request from " + req.remoteAddress
   msg = req.method + ' ' + req.url + ' HTTP ' + req.httpVersion + "\n"
-  msg += JSON.stringify(req.headers)
+  msg += 'User Agent: ' + req.headers["user-agent"]
   client.buddylist.assignWork msg, (message) ->
     res.writeHead 200, {'Content-Type': 'text/html'}
     res.end message + '\n'
