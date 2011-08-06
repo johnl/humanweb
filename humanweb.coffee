@@ -24,6 +24,9 @@ client.on 'stanza', (stanza) ->
     stanza.attrs.to = stanza.attrs.from
     delete stanza.attrs.from
     client.send(stanza)
+  if stanza.is('iq')
+    console.log "Sending pong."
+    client.send(new xmpp.Element('iq', { to : stanza.attrs.from, id : 'c2s1', type : 'result' }))
   if stanza.is('presence') and (stanza.attrs.type == 'subscribe')
     e = new xmpp.Element('presence', { to : stanza.attrs.from, type : 'subscribed' })
     client.send(e)
