@@ -62,14 +62,20 @@ class Buddylist
       buddy.onWorkFinished = work
       this.setBusy(buddy.jid)
       this.sendMessage(buddy.jid, url)
+
+      # In case the user does not respond
+      setTimeout ->
+        if buddy.onWorkFinished
+          fail(504, "The server did not receive a timely response from the upstream human.\n")
+      , 90000
     else
-      fail()
+      fail(503, "No human available to service your request.\n")
 
   nextIdleBuddy: () ->
     @buddies[@idle[0]]
 
   sendMessage: (receiver, message) ->
-    #console.log "Sending " + message + " to: " + receiver
+    console.log "Sending " + message + " to: " + receiver
     e = new xmpp.Element 'message', { to: receiver, type: 'chat' }
     e.c('body').t message
     client.send e
@@ -148,10 +154,9 @@ server = http.createServer( (req, res) ->
   client.buddylist.assignWork msg, (message) ->
     res.writeHead 200, {'Content-Type': 'text/html'}
     res.end message + '\n'
-  , () ->
-    console.log '503'
-    res.writeHead 503, {'Content-Type': 'text/plain'}
-    res.end "No human available to service your request\n"
+  , (errorCode, message) ->
+    res.writeHead errorCode, {'Content-Type': 'text/plain'}
+    res.end message
 )
 
 server.listen 5000
