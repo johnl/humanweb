@@ -5,7 +5,7 @@ argv = process.argv
 http = require 'http'
 
 getRandomInt = (min, max) ->
-  return Math.floor(Math.random() * (max - min + 1)) + min;
+  return Math.floor(Math.g() * (max - min + 1)) + min;
 
 if argv.length != 4
 	 console.error "Usage: <jid> <password> <receiverjid>"
@@ -19,31 +19,62 @@ Array.prototype.delete = (e) ->
 
 Array.prototype.random = () ->
   this[getRandomInt(0,this.length - 1)]
+  
+Array.prototype.exists = (e) ->
+  return this.indexOf(e) >= 0
 
 class Buddylist
   constructor: () ->
     @buddies = {}
     @online = []
-    @busy = []
+    @idle = []
 
   setOnline: (jid) ->
+    return if jid.match(new RegExp('^' + client.jid.user + '@' + client.jid.domain))
     buddy = @buddies[jid] || {}
+    @buddies[jid] = buddy
     buddy.jid = jid
-    @online.push(jid) if @online.indexOf(jid) == -1
-    console.log @online.length + " buddies online"
+    @online.push jid unless @online.exists jid
+    this.setIdle jid
     buddy
 
-  setOffline: (jid) ->
-    @buddies[jid] = undefined
-    @online.delete(jid)
-    @busy.delete(jid)
+  setIdle: (jid) ->
+    return jid unless @buddies[jid]
+    return jid if @idle.exists jid
+    @idle.push(jid)
     jid
 
-  randomBuddy: () ->
-    @online.random()
+  setBusy: (jid) ->
+    return jid unless @buddies[jid]
+    @idle.delete(jid)
+    jid
+
+  setOffline: (jid) ->
+    return jid unless @buddies[jid]
+    @buddies[jid] = undefined
+    @online.delete(jid)
+    @idle.delete(jid)
+    jid
+
+  assignWork: (url, work, fail) ->
+    buddy = this.nextIdleBuddy()
+    if (buddy)
+      buddy.onWorkFinished = work
+      this.setBusy(buddy.jid)
+      this.sendMessage(buddy.jid, url)
+    else
+      fail()
+
+  nextIdleBuddy: () ->
+    @buddies[@idle[0]]
+
+  sendMessage: (receiver, message) ->
+    console.log "Sending " + message + " to: " + receiver  
+    e = new xmpp.Element 'message', { to: receiver, type: 'chat' }
+    e.c('body').t message
+    client.send e
 
 client.buddylist = new Buddylist
-console.log client.buddylist
 
 client.iq = (query, to = undefined, type = 'get') ->
   attrs = { type: type }
@@ -105,13 +136,13 @@ client.on 'error', (e) ->
 
 server = http.createServer( (req, res) ->
   console.log "Received request"
-  res.writeHead 200, {'Content-Type': 'text/plain'}
-  res.end 'Hello World\n'
-  receiver = client.buddylist.randomBuddy()
-  console.log receiver
-  e = new xmpp.Element 'message', { to: receiver, type: 'chat' }
-  e.c('body').t req.url
-  client.send e
+  client.buddylist.assignWork req.url, (message) ->
+    res.writeHead 200, {'Content-Type': 'text/plain'}
+    res.end message + '\n'
+  , () ->
+    console.log '503'
+    res.writeHead 503, {'Content-Type': 'text/plain'}
+    res.end "No human available\n"
 )
 
 server.listen 5000
