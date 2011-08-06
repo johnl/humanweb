@@ -64,8 +64,11 @@ class Buddylist
       this.sendMessage(buddy.jid, url)
 
       # In case the user does not respond
+      blist = this
       setTimeout ->
         if buddy.onWorkFinished
+          blist.setIdle(buddy.jid)
+          blist.sendMessage(buddy.jid, "You timed out! Work faster human!")
           fail(504, "The server did not receive a timely response from the upstream human.\n")
       , 90000
     else
