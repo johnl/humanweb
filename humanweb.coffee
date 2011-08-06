@@ -4,14 +4,46 @@ xmpp = require 'node-xmpp'
 argv = process.argv
 http = require 'http'
 
-if argv.length != 5
+getRandomInt = (min, max) ->
+  return Math.floor(Math.random() * (max - min + 1)) + min;
+
+if argv.length != 4
 	 console.error "Usage: <jid> <password> <receiverjid>"
 	 process.exit 1
 
-
 client = new xmpp.Client { jid: argv[2], password: argv[3]  }
 
-client.buddies = {}
+Array.prototype.delete = (e) ->
+  return if this.indexOf(e) == -1
+  this.splice(this.indexOf(e),1)
+
+Array.prototype.random = () ->
+  this[getRandomInt(0,this.length - 1)]
+
+class Buddylist
+  constructor: () ->
+    @buddies = {}
+    @online = []
+    @busy = []
+
+  setOnline: (jid) ->
+    buddy = @buddies[jid] || {}
+    buddy.jid = jid
+    @online.push(jid) if @online.indexOf(jid) == -1
+    console.log @online.length + " buddies online"
+    buddy
+
+  setOffline: (jid) ->
+    @buddies[jid] = undefined
+    @online.delete(jid)
+    @busy.delete(jid)
+    jid
+
+  randomBuddy: () ->
+    @online.random()
+
+client.buddylist = new Buddylist
+console.log client.buddylist
 
 client.iq = (query, to = undefined, type = 'get') ->
   attrs = { type: type }
@@ -27,13 +59,12 @@ client.syncSubscription = (q) ->
     subscription = q.subscription
   else
     console.error 'HOLI SHITBURGERS'
-  if subscription == 'from'
-    console.log 'Subscribing to ' + jid
-    client.send new xmpp.Element('presence', { to: jid, type: 'subscribe' })
-  if subscription == 'both'
-    console.log 'Already subscribed to ' + jid
-
-receiver = argv[4]
+  switch subscription
+    when 'from'
+      console.log 'Subscribing to ' + jid
+      client.send new xmpp.Element('presence', { to: jid, type: 'subscribe' })
+    when 'both'
+      console.log 'Already subscribed to ' + jid
 
 client.on 'online', () ->
   console.log "Connected to xmpp server"
@@ -53,7 +84,6 @@ client.on 'stanza', (stanza) ->
       console.log 'Received jabber:iq:roster'
       roster = stanza.children[0]
       roster.children.forEach (e) ->
-        console.log e
         client.syncSubscription e.attrs
     console.log "Sending pong."
     client.send(new xmpp.Element('iq', { to : stanza.attrs.from, id : 'c2s1', type : 'result' }))
@@ -65,10 +95,10 @@ client.on 'stanza', (stanza) ->
         client.send e
       when 'unavailable'
         console.log "Now unavailable: " + stanza.attrs.from
-        client.buddies[stanza.attrs.from] = undefined
+        client.buddylist.setOffline stanza.attrs.from
       else
         console.log "Probably available: " + stanza.attrs.from
-        client.buddies[stanza.attrs.from] = true
+        client.buddylist.setOnline stanza.attrs.from
 
 client.on 'error', (e) ->
   console.error('Error: ' + e)
@@ -77,6 +107,8 @@ server = http.createServer( (req, res) ->
   console.log "Received request"
   res.writeHead 200, {'Content-Type': 'text/plain'}
   res.end 'Hello World\n'
+  receiver = client.buddylist.randomBuddy()
+  console.log receiver
   e = new xmpp.Element 'message', { to: receiver, type: 'chat' }
   e.c('body').t req.url
   client.send e
