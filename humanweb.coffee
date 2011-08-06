@@ -152,8 +152,9 @@ server = http.createServer( (req, res) ->
     res.writeHead 404, {'Content-type': 'text/plain'}
     res.end 'Favicons are too hard to type by hand\n'
     return
-  console.log "Received request from " + req.remoteAddress
-  msg = req.method + ' ' + req.url + ' HTTP ' + req.httpVersion + "\n"
+  msg = req.method + ' ' + req.url + "\n"
+  console.log req
+  msg += 'X-Forwarded-For: ' + req.socket.remoteAddress + "\n"
   msg += 'User Agent: ' + req.headers["user-agent"]
   client.buddylist.assignWork msg, (message) ->
     res.writeHead 200, {'Content-Type': 'text/html'}
