@@ -19,7 +19,7 @@ Array.prototype.delete = (e) ->
 
 Array.prototype.random = () ->
   this[getRandomInt(0,this.length - 1)]
-  
+
 Array.prototype.exists = (e) ->
   return this.indexOf(e) >= 0
 
@@ -69,7 +69,7 @@ class Buddylist
     @buddies[@idle[0]]
 
   sendMessage: (receiver, message) ->
-    console.log "Sending " + message + " to: " + receiver  
+    console.log "Sending " + message + " to: " + receiver
     e = new xmpp.Element 'message', { to: receiver, type: 'chat' }
     e.c('body').t message
     client.send e
@@ -106,9 +106,12 @@ client.on 'online', () ->
 
 client.on 'stanza', (stanza) ->
   if stanza.is('message') and (stanza.attrs.type == 'chat')
-    stanza.attrs.to = stanza.attrs.from
-    delete stanza.attrs.from
-    client.send(stanza)
+    buddy = client.buddylist.buddies[stanza.attrs.from]
+    buddy.onWorkFinished(stanza.children[0].children[0])
+    client.buddylist.setIdle(buddy.jid)
+#    stanza.attrs.to = stanza.attrs.from
+#    delete stanza.attrs.from
+#    client.send(stanza)
   if stanza.is('iq')
     # roster response
     if stanza.attrs.type == 'result' and stanza.children[0].attrs.xmlns == 'jabber:iq:roster'
@@ -135,6 +138,10 @@ client.on 'error', (e) ->
   console.error('Error: ' + e)
 
 server = http.createServer( (req, res) ->
+  if req.url.match(/favicon.ico/)
+    res.writeHead 404, {'Content-type': 'text/plain'}
+    res.end 'Favicons are too hard to type by hand\n'
+    return
   console.log "Received request"
   client.buddylist.assignWork req.url, (message) ->
     res.writeHead 200, {'Content-Type': 'text/plain'}
