@@ -15,7 +15,7 @@ client = new xmpp.Client {
 client.on 'online', () ->
   console.log "Connected to xmpp server"
   e = new xmpp.Element('presence', {})
-  e.c('show').t('chat').up().c('status').t('Accepting requests')
+  e.c('show').t('chat').up().c('status').t('Ask me a question!')
   client.send e
 
 client.on 'stanza', (stanza) ->
