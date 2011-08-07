@@ -38,11 +38,6 @@ class Buddylist
     this.setIdle jid
     buddy
 
-  status: (jid) ->
-    return 'offline' unless @online.exists jid
-    return 'idle' if @idle.exists jid
-    return 'serving a request'
-
   setIdle: (jid) ->
     return jid unless @buddies[jid]
     return jid if @idle.exists jid
@@ -163,24 +158,13 @@ client.on 'error', (e) ->
   console.error('Error: ' + e)
 
 server = http.createServer( (req, res) ->
-  console.log "Received HTTP request for " + req.url + " from " + req.socket.remoteAddress
   if req.url == "/"
     res.writeHead 200, {'Content-type': 'text/html'}
-    res.end '<h1>The Human Powered Web Server</h1><p>Welcome to the human powered web server, type any URL in for this domain and the result will be fulfilled by a real live human.</p><p>If you would like to join the workforce, add <a href="xmpp:humanweb@jabber.org">humanweb@jabber.org</a> to your Jabber or Google Talk buddy list.</p>'
+    res.end '<h1>The Human Powered Web Server</h1><p>Welcome to the human powered web server, type any URL in for this domain and the result will be fulfilled by a real live human.</p><p>If you would like to join the workforce, add humanweb@jabber.org to your Jabber or Google Talk buddy list.</p>'
     return
   if req.url.match(/favicon.ico/)
     res.writeHead 404, {'Content-type': 'text/plain'}
     res.end 'Favicons are too hard to type by hand\n'
-    return
-  if req.url == "/status"
-
-    res.writeHead 200, {'Content-type': 'text/html'}
-    res.write '<table>'
-    for buddy in client.buddylist.online
-      do (buddy) ->
-        res.write '<tr><td>'+buddy+'</td><td>' + client.buddylist.status(buddy) + '</tr>'
-    res.write '</table>'
-    res.end '\n'
     return
   msg = req.method + ' ' + req.url + "\n"
   msg += 'X-Forwarded-For: ' + req.socket.remoteAddress + "\n"
