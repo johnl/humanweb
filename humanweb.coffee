@@ -31,6 +31,7 @@ class Buddylist
 
   setOnline: (jid) ->
     return if jid.match(new RegExp('^' + client.jid.user + '@' + client.jid.domain))
+    return if !jid.match(new RegExp('/'))
     buddy = @buddies[jid] || {}
     @buddies[jid] = buddy
     buddy.jid = jid
@@ -56,9 +57,12 @@ class Buddylist
 
   setOffline: (jid) ->
     return jid unless @buddies[jid]
-    @buddies[jid] = undefined
-    @online.delete(jid)
-    @idle.delete(jid)
+    r = new RegExp("^" + jid)
+    for e in @online
+      if e.match(r)
+        @online.delete(e)
+        @idle.delete(e)
+        @buddies[e] = undefined
     jid
 
   assignWork: (url, work, fail) ->
@@ -99,13 +103,13 @@ client.getRoster = () ->
   client.iq new xmpp.Element('query', { xmlns: 'jabber:iq:roster' })
 
 client.syncSubscription = (q) ->
-  jid = q.jid
+  console.log "sync: #{q.jid} #{q.subscription}"
   switch q.subscription
     when 'from'
-      console.log 'Subscribing to ' + jid
-      client.send new xmpp.Element('presence', { to: jid, type: 'subscribe' })
+      console.log 'Subscribing to ' + q.jid
+      client.send new xmpp.Element('presence', { to: q.jid, type: 'subscribe' })
     when 'none'
-      console.log "User #{jid} unsubscribed, leaving on roster"
+      console.log "User #{q.jid} unsubscribed, leaving on roster"
 
 client.on 'online', () ->
   console.log "Connected to xmpp server"
@@ -149,8 +153,10 @@ client.on 'stanza', (stanza) ->
     switch stanza.attrs.type
       when 'subscribe'
         console.log "Subscribe from " + stanza.attrs.from
-        client.buddylist.setOffline stanza.attrs.from
+        client.buddylist.setOnline stanza.attrs.from
         e = new xmpp.Element('presence', { to : stanza.attrs.from, type : 'subscribed' })
+        client.send e
+        e = new xmpp.Element('presence', { to : stanza.attrs.from, type : 'subscribe' })
         client.send e
       when 'unsubscribe'
         console.log "Unsubscribe from " + stanza.attrs.from
