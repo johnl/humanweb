@@ -94,20 +94,13 @@ client.getRoster = () ->
   client.iq new xmpp.Element('query', { xmlns: 'jabber:iq:roster' })
 
 client.syncSubscription = (q) ->
-  if q.jid
-    jid = q.jid
-    subscription = q.subscription
-  else
-    console.error 'HOLI SHITBURGERS'
-  switch subscription
+  jid = q.jid
+  switch q.subscription
     when 'from'
       console.log 'Subscribing to ' + jid
       client.send new xmpp.Element('presence', { to: jid, type: 'subscribe' })
-    when 'both'
-      console.log 'Already subscribed to ' + jid
-    when 'to'
-      console.log 'Unsubscribing from ' + jid
-      client.send new xmpp.Element('presence', { to: jid, type: 'unsubscribe' })
+    when 'none'
+      console.log "User #{jid} unsubscribed, leaving on roster"
 
 client.on 'online', () ->
   console.log "Connected to xmpp server"
@@ -129,29 +122,43 @@ client.on 'stanza', (stanza) ->
       client.buddylist.sendMessage(buddy.jid, 'No web client currently waiting for message')
     client.buddylist.setIdle(buddy.jid)
   if stanza.is('iq')
+    console.log "iq: " + stanza
     # roster response
     if stanza.attrs.type == 'result' and stanza.children[0].attrs.xmlns == 'jabber:iq:roster'
       console.log 'Received jabber:iq:roster'
       roster = stanza.children[0]
-      roster.children.forEach (e) ->
-        client.syncSubscription e.attrs
-    console.log "Sending pong."
-    client.send(new xmpp.Element('iq', { to : stanza.attrs.from, id : 'c2s1', type : 'result' }))
+      roster.children.forEach (item) ->
+        if item.attrs.ask == "subscribe"
+          client.syncSubscription item.attrs
+          return
+        if item.attrs.subscription == "from"
+          client.syncSubscription item.attrs
+          return
+      return
+
+    if stanza.attrs.id == "ping"
+      console.log "Received ping from #{stanza.attrs.from}, sending pong."
+      client.send(new xmpp.Element('iq', { to : stanza.attrs.from, id : 'c2s1', type : 'result' }))
   if stanza.is('presence')
+    console.log "presence: " + stanza
     switch stanza.attrs.type
       when 'subscribe'
-        console.log "Subscribing user " + stanza.attrs.from
+        console.log "Subscribe from " + stanza.attrs.from
+        client.buddylist.setOffline stanza.attrs.from
         e = new xmpp.Element('presence', { to : stanza.attrs.from, type : 'subscribed' })
         client.send e
-        client.getRoster()
       when 'unsubscribe'
         console.log "Unsubscribe from " + stanza.attrs.from
-        client.getRoster()
+        client.buddylist.setOffline stanza.attrs.from
+      when 'unsubscribed'
+        console.log "Unsubscribed from " + stanza.attrs.from
+        client.buddylist.setOffline stanza.attrs.from
       when 'unavailable'
-        console.log "Now unavailable: " + stanza.attrs.from
+        console.log "Unavailable: " + stanza.attrs.from
         client.buddylist.setOffline stanza.attrs.from
       else
-        console.log "Probably available: " + stanza.attrs.from
+        return if !stanza.attrs.from.match(/\//)
+        console.log "Available: " + stanza.attrs.from
         client.buddylist.setOnline stanza.attrs.from
 
 client.on 'error', (e) ->
