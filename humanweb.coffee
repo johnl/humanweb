@@ -59,7 +59,7 @@ class Buddylist
     return jid unless @buddies[jid]
     r = new RegExp("^" + jid)
     for e in @online
-      if e.match(r)
+      if e != undefined and e.match(r)
         @online.delete(e)
         @idle.delete(e)
         @buddies[e] = undefined
@@ -127,6 +127,7 @@ client.on 'stanza', (stanza) ->
 
     if buddy.onWorkFinished
       buddy.onWorkFinished(stanza.children[0].children.join(''))
+      buddy.onWorkFinished = undefined
     else
       client.buddylist.sendMessage(buddy.jid, 'No web client currently waiting for message')
     client.buddylist.setIdle(buddy.jid)
@@ -149,7 +150,6 @@ client.on 'stanza', (stanza) ->
       console.log "Received ping from #{stanza.attrs.from}, sending pong."
       client.send(new xmpp.Element('iq', { to : stanza.attrs.from, id : 'c2s1', type : 'result' }))
   if stanza.is('presence')
-    console.log "presence: " + stanza
     switch stanza.attrs.type
       when 'subscribe'
         console.log "Subscribe from " + stanza.attrs.from
@@ -179,14 +179,19 @@ server = http.createServer( (req, res) ->
   console.log "Received HTTP request for " + req.url + " from " + req.socket.remoteAddress
   if req.url == "/"
     res.writeHead 200, {'Content-type': 'text/html'}
-    res.end '<h1>The Human Powered Web Server</h1><p>Welcome to the human powered web server, type any URL in for this domain and the result will be fulfilled by a real live human.</p><p>If you would like to join the workforce, add <a href="xmpp:humanweb@jabber.org">humanweb@jabber.org</a> to your Jabber or Google Talk buddy list.</p>'
+    res.write '<h1>The Human Powered Web Server</h1>'
+    res.write '<p>Welcome to the human powered web server, type any URL in for this domain and the result will be fulfilled by a real live human.</p><p>If you would like to join the workforce, add <a href="xmpp:humanweb@jabber.org">humanweb@jabber.org</a> to your Jabber or Google Talk buddy list.</p>'
+    res.write "<p>Once you have the buddy added, you'll start to receive web requests. You have 90 seconds to write a response (html or plain text is fine) and it'll be sent back to the originators web browser. Do it all on one line.</p>"
+    res.write "<p>Return the message '404' to send a 404 not found response.</p>"
+    res.write "<p>You can stop receiving requests by removing the user from your jabber list</p>"
+    res.write '<p>It was written by <a href="http://daveverwer.com/">Dave Verwer</a> and <a href="http://johnleach.co.uk">John Leach</a> during a <a href="http://leedshack.com/">leeds hack</a> session.</p>'
+    res.end "\n"
     return
-  if req.url.match(/favicon.ico/)
+  if req.url.match(/favicon.ico|robots.txt|favicon.png/)
     res.writeHead 404, {'Content-type': 'text/plain'}
-    res.end 'Favicons are too hard to type by hand\n'
+    res.end 'Ignored\n'
     return
   if req.url == "/status"
-
     res.writeHead 200, {'Content-type': 'text/html'}
     res.write '<table>'
     for buddy in client.buddylist.online
@@ -195,11 +200,21 @@ server = http.createServer( (req, res) ->
     res.write '</table>'
     res.end '\n'
     return
+  if req.headers["Referer"]
+    console.log "Ignoring request with referer"
+    res.writeHead 404, {'Content-type': 'text/html'}
+    res.write "No referer headers please"
+    res.end "\n"
+    return
   msg = req.method + ' ' + req.url + "\n"
   msg += 'X-Forwarded-For: ' + req.socket.remoteAddress + "\n"
   msg += 'User Agent: ' + req.headers["user-agent"]
   client.buddylist.assignWork msg, (message) ->
-    res.writeHead 200, {'Content-Type': 'text/html'}
+    if message == '404'
+      res.writeHead 404, {}
+      res.end "Human sent 404\n"
+      return
+    res.writeHead 200, {'Content-Type': 'text/html', 'Cache-Control': 'public,max-age=600', 'Last-Modified': (new Date).toUTCString(), 'Server': 'Human'}
     res.end message + '\n'
   , (errorCode, message) ->
     res.writeHead errorCode, {'Content-Type': 'text/plain'}
